@@ -1,9 +1,7 @@
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.express as px
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.svm import SVC
@@ -48,30 +46,27 @@ with col2:
     sns.boxplot(x='Region', y='Exam_Score', data=df)
     st.pyplot(plt.gcf()); plt.clf()
 
-st.subheader("זמן תרגול שבועי מול ציון")
+st.subheader("⏱ זמן תרגול שבועי מול ציון")
 sns.scatterplot(x='HoursStudied/Week', y='Exam_Score', data=df)
 st.pyplot(plt.gcf()); plt.clf()
 
-st.subheader("השכלת הורים מול ציון")
+st.subheader("🎓 השכלת הורים מול ציון")
 sns.barplot(x='Parent Education', y='Exam_Score', data=df)
 st.pyplot(plt.gcf()); plt.clf()
 
-st.subheader("נוכחות בשיעור מול ציון")
+st.subheader("📚 נוכחות בשיעור מול ציון")
 def atc(att):
     if att < 60:
         return 'Poor Attendance <60'
     elif att < 80:
-        return 'Average Attendance 80<>60'
+        return 'Average Attendance 60-80'
     else:
         return 'Excellent Attendance >80'
-
 df['Attendance Group'] = df['Attendance(%)'].apply(atc)
-plt.figure(figsize=(10, 6))
 sns.boxplot(x='Attendance Group', y='Exam_Score', data=df)
 st.pyplot(plt.gcf()); plt.clf()
 
-st.subheader("מתאם מול ציון מבחן")
-plt.figure(figsize=(17, 1))
+st.subheader("📈 מתאם מול ציון מבחן")
 sns.heatmap(df.corr(numeric_only=True)[['Exam_Score']].T, cmap="Blues", annot=True)
 st.pyplot(plt.gcf()); plt.clf()
 
@@ -88,7 +83,7 @@ st.subheader("📈 Linear Regression")
 reg = LinearRegression()
 reg.fit(X_train_scaled, y_train)
 y_pred_lr = reg.predict(X_test_scaled)
-st.write(f"**R²:** {r2_score(y_test, y_pred_lr):.2f}")
+st.write(f"**R² של לינארי:** {r2_score(y_test, y_pred_lr):.2f}")
 
 st.subheader("📊 KNN Regressor")
 knn_pipe = Pipeline([
@@ -100,7 +95,7 @@ knn_search = GridSearchCV(knn_pipe, param_grid=param_grid, cv=5)
 knn_search.fit(X_train_scaled, y_train)
 best_knn = knn_search.best_estimator_
 y_pred_knn = best_knn.predict(X_test_scaled)
-st.write(f"**R²:** {r2_score(y_test, y_pred_knn):.2f}")
+st.write(f"**R² של KNN Regressor:** {r2_score(y_test, y_pred_knn):.2f}")
 
 st.subheader("🎯 KNN Classifier")
 X_cls = df.drop(['Exam_Score', 'Grade', 'Attendance Group'], axis=1)
@@ -112,7 +107,7 @@ X_test_cls = scaler.transform(X_test_cls)
 knn_classifier = KNeighborsClassifier(n_neighbors=5)
 knn_classifier.fit(X_train_cls, y_train_cls)
 y_pred_class = knn_classifier.predict(X_test_cls)
-st.text("דו"ח סיווג:")
+st.text("דו\"ח סיווג - KNN:")
 st.code(classification_report(y_test_cls, y_pred_class))
 ConfusionMatrixDisplay.from_estimator(knn_classifier, X_test_cls, y_test_cls, cmap='Blues')
 st.pyplot(plt.gcf()); plt.clf()
@@ -121,10 +116,10 @@ st.subheader("🧠 SVM Classifier")
 svm_model = SVC(kernel="linear")
 svm_model.fit(X_train_cls, y_train_cls)
 y_pred_svm = svm_model.predict(X_test_cls)
-st.text("דו"ח סיווג:")
+st.text("דו\"ח סיווג - SVM:")
 st.code(classification_report(y_test_cls, y_pred_svm))
 ConfusionMatrixDisplay.from_estimator(svm_model, X_test_cls, y_test_cls, cmap='Purples')
 st.pyplot(plt.gcf()); plt.clf()
 
-st.markdown("___")
-st.markdown("*תלמידים רבים מאשימים את אי הצלחתם בגורמים חיצוניים. מטרת הפרויקט הייתה לבדוק לעומק האם באמת יש לכך השפעה, או שהשפעה משמעותית נובעת דווקא מגורמים אחרים כמו תרגול ונוכחות.*")
+st.markdown("---")
+st.markdown("📝 **סיכום:** תלמידים רבים מאשימים את אי הצלחתם בגורמים חיצוניים. מטרת הפרויקט הייתה לבדוק לעומק האם באמת יש לכך השפעה, או שהשפעה משמעותית נובעת דווקא מגורמים אחרים כמו תרגול ונוכחות.")
