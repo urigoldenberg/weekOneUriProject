@@ -8,19 +8,16 @@ from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import r2_score, classification_report
-
-import numpy as np
+from sklearn.metrics import r2_score
 
 st.set_page_config(layout="wide")
 
 def rtl(text):
     return f'<div dir="rtl" style="text-align:right">{text}</div>'
 
-st.markdown(rtl("# 📘 מה משפיע באמת על ציוני תלמידים?"), unsafe_allow_html=True)
+st.title("📘 מה משפיע באמת על ציוני תלמידים?")
 
 st.markdown(rtl("""
-### 🔍 רקע:
 בפרויקט זה נבדק האם באמת תלמידים שנכשלים עושים זאת בגלל העדר מורה פרטי, מקום מגורים או השכלת הורים – או שמא יש גורמים חזקים יותר כמו נוכחות ותרגול.
 """), unsafe_allow_html=True)
 
@@ -31,35 +28,33 @@ def load_data():
     df['Gender'] = df['Gender'].map({'Female': 0, 'Male': 1})
     df['Tutoring'] = df['Tutoring'].map({'No': 0, 'Yes': 1})
     df['Region'] = df['Region'].map({'Rural': 0, 'Urban': 1})
-    df['Parent Education'] = df['Parent Education'].map({'Tertiary': 2, 'Primary': 0,'Secondary':1})
+    df['Parent Education'] = df['Parent Education'].map({'Tertiary': 2, 'Primary': 0, 'Secondary': 1})
     df['Grade'] = df['Exam_Score'].apply(lambda x: 'Pass' if x >= 55 else 'Fail')
     return df
 
 df = load_data()
 
-# גרידים
-st.markdown(rtl("## 🎨 ניתוח גרפי של מאפיינים מול ציונים"), unsafe_allow_html=True)
+st.subheader("🔎 ניתוח גרפי של מאפיינים מול ציונים")
+
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown(rtl("**✳ מין מול ציון**"), unsafe_allow_html=True)
-    plt.figure(figsize=(4, 3))
+    st.markdown(rtl("מין מול ציון"), unsafe_allow_html=True)
     sns.barplot(x='Gender', y='Exam_Score', data=df)
     st.pyplot(plt.gcf()); plt.clf()
+
 with col2:
-    st.markdown(rtl("**🏙 אזור מגורים מול ציון**"), unsafe_allow_html=True)
-    plt.figure(figsize=(4, 3))
+    st.markdown(rtl("אזור מגורים מול ציון"), unsafe_allow_html=True)
     sns.boxplot(x='Region', y='Exam_Score', data=df)
     st.pyplot(plt.gcf()); plt.clf()
 
 col3, col4 = st.columns(2)
 with col3:
-    st.markdown(rtl("**⏱ שעות תרגול בשבוע**"), unsafe_allow_html=True)
-    plt.figure(figsize=(4, 3))
+    st.markdown(rtl("שעות תרגול בשבוע"), unsafe_allow_html=True)
     sns.scatterplot(x='HoursStudied/Week', y='Exam_Score', data=df)
     st.pyplot(plt.gcf()); plt.clf()
+
 with col4:
-    st.markdown(rtl("**🎓 השכלת הורים מול ציון**"), unsafe_allow_html=True)
-    plt.figure(figsize=(4, 3))
+    st.markdown(rtl("השכלת הורים מול ציון"), unsafe_allow_html=True)
     sns.barplot(x='Parent Education', y='Exam_Score', data=df)
     st.pyplot(plt.gcf()); plt.clf()
 
@@ -70,17 +65,15 @@ def atc(att):
 
 df['Attendance Group'] = df['Attendance(%)'].apply(atc)
 
-st.markdown(rtl("**📚 נוכחות מול ציון**"), unsafe_allow_html=True)
-plt.figure(figsize=(6, 3))
+st.markdown(rtl("נוכחות מול ציון"), unsafe_allow_html=True)
 sns.boxplot(x='Attendance Group', y='Exam_Score', data=df)
 st.pyplot(plt.gcf()); plt.clf()
 
-st.markdown(rtl("**📊 מתאם מול הציון**"), unsafe_allow_html=True)
-plt.figure(figsize=(6, 1))
+st.markdown(rtl("מתאם מול הציון"), unsafe_allow_html=True)
 sns.heatmap(df.corr(numeric_only=True)[['Exam_Score']].T, annot=True, cmap='Blues')
 st.pyplot(plt.gcf()); plt.clf()
 
-# הכנות למודלים
+# הכנת הנתונים
 X = df.drop(['Exam_Score', 'Grade', 'Attendance Group'], axis=1)
 y_reg = df['Exam_Score']
 y_cls = df['Grade']
@@ -96,37 +89,24 @@ X_test_cls_scaled = scaler.transform(X_test_cls)
 
 # מודלים
 reg = LinearRegression().fit(X_train_scaled, y_train)
-r2_lr = r2_score(y_test, reg.predict(X_test_scaled))
-
 knn_pipe = Pipeline([('scale', StandardScaler()), ('knn', KNeighborsRegressor())])
 knn_cv = GridSearchCV(knn_pipe, {'knn__n_neighbors': list(range(1, 15))}, cv=5)
 knn_cv.fit(X_train_scaled, y_train)
 best_knn = knn_cv.best_estimator_
-r2_knn = r2_score(y_test, best_knn.predict(X_test_scaled))
 
 knn_clf = KNeighborsClassifier(n_neighbors=5).fit(X_train_cls_scaled, y_train_cls)
 svm_model = SVC(kernel="linear").fit(X_train_cls_scaled, y_train_cls)
-acc_knn = knn_clf.score(X_test_cls_scaled, y_test_cls)
-acc_svm = svm_model.score(X_test_cls_scaled, y_test_cls)
 
-# הצגת תוצאות
-st.markdown(rtl("## 🤖 סיכום המודלים שבניתי"), unsafe_allow_html=True)
+# הצגת ביצועי מודלים
+st.subheader("📊 סיכום המודלים שבניתי")
 
-st.markdown(rtl(f"### 🔷 Linear Regression - R²: {r2_lr:.2f}"), unsafe_allow_html=True)
-st.markdown(rtl("חזוי מדויק של ציון"), unsafe_allow_html=True)
+st.markdown(rtl(f"Linear Regression - R²: {r2_score(y_test, reg.predict(X_test_scaled)):.2f}"), unsafe_allow_html=True)
+st.markdown(rtl(f"KNN Regressor - R²: {r2_score(y_test, best_knn.predict(X_test_scaled)):.2f} (k={knn_cv.best_params_['knn__n_neighbors']})"), unsafe_allow_html=True)
+st.markdown(rtl(f"KNN Classifier - דיוק: {knn_clf.score(X_test_cls_scaled, y_test_cls):.2%}"), unsafe_allow_html=True)
+st.markdown(rtl(f"SVM Classifier - דיוק: {svm_model.score(X_test_cls_scaled, y_test_cls):.2%}"), unsafe_allow_html=True)
 
-st.markdown(rtl(f"### 🔷 KNN Regressor - R²: {r2_knn:.2f} (k={knn_cv.best_params_['knn__n_neighbors']})"), unsafe_allow_html=True)
-st.markdown(rtl("חיזוי ציון לפי שכנים קרובים"), unsafe_allow_html=True)
-
-st.markdown(rtl(f"### 🔷 KNN Classifier - דיוק: {acc_knn:.2%}"), unsafe_allow_html=True)
-st.markdown(rtl("קביעה האם יעבור/ייכשל"), unsafe_allow_html=True)
-
-st.markdown(rtl(f"### 🔷 SVM Classifier - דיוק: {acc_svm:.2%}"), unsafe_allow_html=True)
-st.markdown(rtl("סיווג על סמך קו מפריד חכם"), unsafe_allow_html=True)
-
-# ניבוי לפי קלט
-st.markdown("---")
-st.markdown(rtl("## 🧪 ניבוי לפי קלט שלך"), unsafe_allow_html=True)
+# תחזית לפי קלט
+st.subheader("🧪 ניבוי לפי קלט שלך")
 
 with st.form("predict_form"):
     gender = st.selectbox("מין", ["Female", "Male"])
@@ -147,9 +127,10 @@ with st.form("predict_form"):
             'Attendance(%)': attendance
         }])
         X_input = scaler.transform(input_data[X.columns])
-        st.markdown(rtl(f"📘 Linear Prediction: {reg.predict(X_input)[0]:.2f}"), unsafe_allow_html=True)
-        st.markdown(rtl(f"📗 KNN Prediction: {best_knn.predict(X_input)[0]:.2f}"), unsafe_allow_html=True)
-        st.markdown(rtl(f"📕 SVM Success/Fail: {svm_model.predict(X_input)[0]}"), unsafe_allow_html=True)
+
+        st.markdown(rtl(f"Linear Regression חוזה ציון: {reg.predict(X_input)[0]:.2f}"), unsafe_allow_html=True)
+        st.markdown(rtl(f"KNN Regressor חוזה ציון: {best_knn.predict(X_input)[0]:.2f}"), unsafe_allow_html=True)
+        st.markdown(rtl(f"SVM חוזה הצלחה/כישלון: {svm_model.predict(X_input)[0]}"), unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown(rtl("📝 בסוף גילינו שנוכחות ותרגול חשובים יותר ממין, מגורים או מורה פרטי."), unsafe_allow_html=True)
+st.markdown(rtl("בסוף גילינו שנוכחות ותרגול חשובים יותר ממין, מגורים או מורה פרטי."), unsafe_allow_html=True)
