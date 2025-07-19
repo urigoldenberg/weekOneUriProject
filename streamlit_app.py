@@ -1,15 +1,26 @@
+
 import streamlit as st
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.linear_model import LinearRegression
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, ConfusionMatrixDisplay, accuracy_score
+import seaborn as sns
 import plotly.express as px
+from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import r2_score, accuracy_score, classification_report, ConfusionMatrixDisplay
+
+st.set_page_config(layout="wide")
+
+st.title("📊 פרויקט: מה משפיע על ציוני תלמידים?")
+
+st.markdown("""
+## 🧠 רקע
+הרבה תלמידים מאשימים גורמים כמו החוסר במורה פרטית, מקום מגורים והשכלת ההורים בציוניהם הגרועים.  
+בפרויקט זה נראה איזה נתונים משפיעים ואילו לא משפיעים על הציון הסופי.
+""")
 
 @st.cache_data
 def load_data():
@@ -24,79 +35,96 @@ def load_data():
 
 df = load_data()
 
-st.title("📚 פרויקט ציוני תלמידים - ניתוח ותחזית")
+st.header("🔎 ניתוח גרפי")
 
-menu = st.sidebar.radio("תפריט", ["הצגת הדאטה", "גרפים", "מודלים", "השוואת מודלים"])
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("מין מול ציון")
+    sns.barplot(x='Gender', y='Exam_Score', data=df)
+    st.pyplot(plt.gcf()); plt.clf()
 
-if menu == "הצגת הדאטה":
-    st.subheader("הדאטה המלא")
-    st.dataframe(df)
+with col2:
+    st.subheader("מגורים עירוניים מול ציונים")
+    sns.boxplot(x='Region', y='Exam_Score', data=df)
+    st.pyplot(plt.gcf()); plt.clf()
 
-elif menu == "גרפים":
-    st.subheader("גרפים חשובים")
-    col1, col2 = st.columns(2)
-    with col1:
-        fig = px.bar(df, x="Gender", y="Exam_Score", title="ציון לפי מין")
-        st.plotly_chart(fig)
-    with col2:
-        fig = px.box(df, x="Region", y="Exam_Score", title="ציון לפי אזור")
-        st.plotly_chart(fig)
-    fig = px.scatter(df, x="HoursStudied/Week", y="Exam_Score", title="זמן לימוד מול ציון")
-    st.plotly_chart(fig)
+st.subheader("זמן תרגול שבועי מול ציון")
+sns.scatterplot(x='HoursStudied/Week', y='Exam_Score', data=df)
+st.pyplot(plt.gcf()); plt.clf()
 
-elif menu == "מודלים":
-    st.subheader("מודלים לחיזוי הצלחה")
-    model_type = st.selectbox("בחר מודל", ["Linear Regression", "KNN", "SVM"])
+st.subheader("השכלת הורים מול ציון")
+sns.barplot(x='Parent Education', y='Exam_Score', data=df)
+st.pyplot(plt.gcf()); plt.clf()
 
-    X = df.drop(["Exam_Score", "Grade"], axis=1)
-    y_class = df['Grade']
-    y_reg = df['Exam_Score']
+st.subheader("נוכחות בשיעור מול ציון")
+def atc(att):
+    if att < 60:
+        return 'Poor Attendance <60'
+    elif att < 80:
+        return 'Average Attendance 80<>60'
+    else:
+        return 'Excellent Attendance >80'
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y_class if model_type != "Linear Regression" else y_reg,
-                                                        test_size=0.2, random_state=42)
+df['Attendance Group'] = df['Attendance(%)'].apply(atc)
+plt.figure(figsize=(10, 6))
+sns.boxplot(x='Attendance Group', y='Exam_Score', data=df)
+st.pyplot(plt.gcf()); plt.clf()
 
-    scaler = MinMaxScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+st.subheader("מתאם מול ציון מבחן")
+plt.figure(figsize=(17, 1))
+sns.heatmap(df.corr(numeric_only=True)[['Exam_Score']].T, cmap="Blues", annot=True)
+st.pyplot(plt.gcf()); plt.clf()
 
-    if model_type == "Linear Regression":
-        reg = LinearRegression()
-        reg.fit(X_train_scaled, y_train)
-        score = reg.score(X_test_scaled, y_test)
-        st.metric("R²", f"{score:.2f}")
+st.header("🤖 בניית מודלים")
 
-    elif model_type == "KNN":
-        pipe = Pipeline([("scale", StandardScaler()), ("knn", KNeighborsClassifier(n_neighbors=5))])
-        pipe.fit(X_train_scaled, y_train)
-        y_pred = pipe.predict(X_test_scaled)
-        st.text("דוח סיווג:")
-        st.code(classification_report(y_test, y_pred))
-        ConfusionMatrixDisplay.from_estimator(pipe, X_test_scaled, y_test, cmap="Blues")
-        st.pyplot(plt.gcf())
+X_reg = df.drop(['Exam_Score', 'Grade', 'Attendance Group'], axis=1)
+y_reg = df['Exam_Score']
+X_train, X_test, y_train, y_test = train_test_split(X_reg, y_reg, test_size=0.2, random_state=42)
+scaler = MinMaxScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-    elif model_type == "SVM":
-        svm_model = SVC(kernel="linear")
-        svm_model.fit(X_train_scaled, y_train)
-        y_pred = svm_model.predict(X_test_scaled)
-        st.text("דוח סיווג:")
-        st.code(classification_report(y_test, y_pred))
-        ConfusionMatrixDisplay.from_estimator(svm_model, X_test_scaled, y_test, cmap="Purples")
-        st.pyplot(plt.gcf())
+st.subheader("📈 Linear Regression")
+reg = LinearRegression()
+reg.fit(X_train_scaled, y_train)
+y_pred_lr = reg.predict(X_test_scaled)
+st.write(f"**R²:** {r2_score(y_test, y_pred_lr):.2f}")
 
-elif menu == "השוואת מודלים":
-    st.subheader("השוואת KNN מול SVM")
+st.subheader("📊 KNN Regressor")
+knn_pipe = Pipeline([
+    ('scale', StandardScaler()),
+    ('knn', KNeighborsRegressor())
+])
+param_grid = {'knn__n_neighbors': list(range(1, 15))}
+knn_search = GridSearchCV(knn_pipe, param_grid=param_grid, cv=5)
+knn_search.fit(X_train_scaled, y_train)
+best_knn = knn_search.best_estimator_
+y_pred_knn = best_knn.predict(X_test_scaled)
+st.write(f"**R²:** {r2_score(y_test, y_pred_knn):.2f}")
 
-    X = df.drop(["Exam_Score", "Grade"], axis=1)
-    y = df["Grade"]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    scaler = MinMaxScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+st.subheader("🎯 KNN Classifier")
+X_cls = df.drop(['Exam_Score', 'Grade', 'Attendance Group'], axis=1)
+y_cls = df['Grade']
+X_train_cls, X_test_cls, y_train_cls, y_test_cls = train_test_split(X_cls, y_cls, test_size=0.2, random_state=42)
+X_train_cls = scaler.fit_transform(X_train_cls)
+X_test_cls = scaler.transform(X_test_cls)
 
-    knn = KNeighborsClassifier(n_neighbors=5)
-    knn.fit(X_train_scaled, y_train)
-    svm = SVC(kernel="linear")
-    svm.fit(X_train_scaled, y_train)
+knn_classifier = KNeighborsClassifier(n_neighbors=5)
+knn_classifier.fit(X_train_cls, y_train_cls)
+y_pred_class = knn_classifier.predict(X_test_cls)
+st.text("דו"ח סיווג:")
+st.code(classification_report(y_test_cls, y_pred_class))
+ConfusionMatrixDisplay.from_estimator(knn_classifier, X_test_cls, y_test_cls, cmap='Blues')
+st.pyplot(plt.gcf()); plt.clf()
 
-    st.metric("🎯 דיוק KNN", f"{accuracy_score(y_test, knn.predict(X_test_scaled)):.2f}")
-    st.metric("🎯 דיוק SVM", f"{accuracy_score(y_test, svm.predict(X_test_scaled)):.2f}")
+st.subheader("🧠 SVM Classifier")
+svm_model = SVC(kernel="linear")
+svm_model.fit(X_train_cls, y_train_cls)
+y_pred_svm = svm_model.predict(X_test_cls)
+st.text("דו"ח סיווג:")
+st.code(classification_report(y_test_cls, y_pred_svm))
+ConfusionMatrixDisplay.from_estimator(svm_model, X_test_cls, y_test_cls, cmap='Purples')
+st.pyplot(plt.gcf()); plt.clf()
+
+st.markdown("___")
+st.markdown("*תלמידים רבים מאשימים את אי הצלחתם בגורמים חיצוניים. מטרת הפרויקט הייתה לבדוק לעומק האם באמת יש לכך השפעה, או שהשפעה משמעותית נובעת דווקא מגורמים אחרים כמו תרגול ונוכחות.*")
